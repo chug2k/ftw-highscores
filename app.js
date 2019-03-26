@@ -35,8 +35,12 @@
 //
 // Preamble
 var http = require ('http');	     // For serving a basic web page.
-var mongoose = require ("mongoose"); // The reason for this demo.
+var mongoose = require ("mongoose"), // The reason for this demo.
+    express  = require('express'),
+    app = express(),
+    bodyParser = require('body-parser');
 
+app.use(bodyParser.urlencoded({extended: false}));
 // Here we find an appropriate database to connect to, defaulting to
 // localhost if we don't find one.  
 var uristring = 
@@ -47,8 +51,6 @@ var uristring =
 // port 5000.
 var theport = process.env.PORT || 5000;
 
-// Makes connection asynchronously.  Mongoose will queue up database
-// operations and release them when the connection is complete.
 mongoose.connect(uristring, function (err, res) {
   if (err) { 
     console.log ('ERROR connecting to: ' + uristring + '. ' + err);
@@ -57,110 +59,63 @@ mongoose.connect(uristring, function (err, res) {
   }
 });
 
-// This is the schema.  Note the types, validation and trim
-// statements.  They enforce useful constraints on the data.
-var userSchema = new mongoose.Schema({
-  name: {
-    first: String,
-    last: { type: String, trim: true }
-  },
-  age: { type: Number, min: 0}
+
+var GameEntrySchema = new mongoose.Schema({
+  gameId: { type: String, required: true },
+  player: { type: String, required: true },
+  score:  { type: Number, required: true },
+  scope:  String,
+  createdAt: { type: Date, 'default': Date.now }
 });
 
-// Compiles the schema into a model, opening (or creating, if
-// nonexistent) the 'PowerUsers' collection in the MongoDB database
-var PUser = mongoose.model('PowerUsers', userSchema);
+var GameEntry = mongoose.model('GameEntry', GameEntrySchema);
 
-// Clear out old data
-PUser.remove({}, function(err) {
-  if (err) {
-    console.log ('error deleting old data.');
+function getList(gameId, options, cb) {
+  options = options || {};
+  var query = GameEntry.find({ gameId: gameId }, null, {})
+    .lean()
+    .sort({ score: options.order || -1 })
+    .limit(options.limit || 10);
+  if (options.scope) {
+    query.where('scope', options.scope );
   }
-});
-
-// Creating one user.
-var johndoe = new PUser ({
-  name: { first: 'John', last: 'Doe' },
-  age: 25
-});
-
-// Saving it to the database.  
-johndoe.save(function (err) {if (err) console.log ('Error on save!')});
-
-// Creating more users manually
-var janedoe = new PUser ({
-  name: { first: 'Jane', last: 'Doe' },
-  age: 65
-});
-janedoe.save(function (err) {if (err) console.log ('Error on save!')});
-
-// Creating more users manually
-var alicesmith = new PUser ({
-  name: { first: 'Alice', last: 'Smith' },
-  age: 45
-});
-alicesmith.save(function (err) {if (err) console.log ('Error on save!')});
-
-
-// In case the browser connects before the database is connected, the
-// user will see this message.
-var found = ['DB Connection not yet established.  Try again later.  Check the console output for error messages if this persists.'];
-
-// Create a rudimentary http server.  (Note, a real web application
-// would use a complete web framework and router like express.js). 
-// This is effectively the main interaction loop for the application. 
-// As new http requests arrive, the callback function gets invoked.
-http.createServer(function (req, res) {
-  res.writeHead(200, {'Content-Type': 'text/html'});
-  createWebpage(req, res);
-}).listen(theport);
-
-function createWebpage (req, res) {
-  // Let's find all the documents
-  PUser.find({}).exec(function(err, result) { 
-    if (!err) { 
-      res.write(html1 + JSON.stringify(result, undefined, 2) +  html2 + result.length + html3);
-      // Let's see if there are any senior citizens (older than 64) with the last name Doe using the query constructor
-      var query = PUser.find({'name.last': 'Doe'}); // (ok in this example, it's all entries)
-      query.where('age').gt(64);
-      query.exec(function(err, result) {
-	if (!err) {
-	  res.end(html4 + JSON.stringify(result, undefined, 2) + html5 + result.length + html6);
-	} else {
-	  res.end('Error in second query. ' + err)
-	}
-      });
-    } else {
-      res.end('Error in first query. ' + err)
-    };
-  });
+  query.exec(cb);
 }
 
-// Tell the console we're getting ready.
-// The listener in http.createServer should still be active after these messages are emitted.
-console.log('http server will be listening on port %d', theport);
-console.log('CTRL+C to exit');
-
-//
-// House keeping.
-
-//
-// The rudimentary HTML content in three pieces.
-var html1 = '<title> hello-mongoose: MongoLab MongoDB Mongoose Node.js Demo on Heroku </title> \
-<head> \
-<style> body {color: #394a5f; font-family: sans-serif} </style> \
-</head> \
-<body> \
-<h1> hello-mongoose: MongoLab MongoDB Mongoose Node.js Demo on Heroku </h1> \
-See the <a href="https://devcenter.heroku.com/articles/nodejs-mongoose">supporting article on the Dev Center</a> to learn more about data modeling with Mongoose. \
-<br\> \
-<br\> \
-<br\> <h2> All Documents in MonogoDB database </h2> <pre><code> ';
-var html2 = '</code></pre> <br\> <i>';
-var html3 = ' documents. </i> <br\> <br\>';
-var html4 = '<h2> Queried (name.last = "Doe", age >64) Documents in MonogoDB database </h2> <pre><code> ';
-var html5 = '</code></pre> <br\> <i>';
-var html6 = ' documents. </i> <br\> <br\> \
-<br\> <br\> <center><i> Demo code available at <a href="http://github.com/mongolab/hello-mongoose">github.com</a> </i></center>';
+function addToList(gameId, attributes, cb) {
+  var item = new GameEntry(attributes);
+  item.set('gameId', gameId);
+  item.save(cb);
+}
 
 
+app.get('/:gameId', function(req, res) {
+  var options = {
+    order: req.query.reverse ? -1 : 1,
+    limit: req.query.limit || 10,
+    scope: req.query.scope || null
+  };
+  getList(req.params.gameId, options, function(err, items) {
+    res.type('application/json');
+    if (err) {
+      res.jsonp(400, { error: err.message });
+    } else {
+      res.jsonp({ items: items });
+    }
+  });
+});
+
+app.post('/:gameId', function(req, res) {
+  addToList(req.params.gameId, req.body, function(err) {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.type('application/json');
+    if (err) {
+      res.send(500, { error: err.message || 'Undefined error' });
+    } else {
+      res.send({ success: true });
+    }
+  });
+});
+
+app.listen(theport);
+console.log("Started server at 172.0.0.1:8181");
