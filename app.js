@@ -40,6 +40,9 @@ var mongoose = require ("mongoose"), // The reason for this demo.
     app = express(),
     bodyParser = require('body-parser');
 
+var cors = require('cors')
+
+app.options('*', cors()) // include before other routes
 app.use(bodyParser.urlencoded({extended: false}));
 // Here we find an appropriate database to connect to, defaulting to
 // localhost if we don't find one.  
