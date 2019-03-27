@@ -96,6 +96,7 @@ app.get('/:gameId', function(req, res) {
     scope: req.query.scope || null
   };
   getList(req.params.gameId, options, function(err, items) {
+    res.header('Access-Control-Allow-Origin', '*');
     res.type('application/json');
     if (err) {
       res.jsonp(400, { error: err.message });
