@@ -88,6 +88,17 @@ function addToList(gameId, attributes, cb) {
   item.save(cb);
 }
 
+app.delete('/:gameId/:scoreId', function(req, res) {
+  GameEntry.deleteOne({ '_id': req.params.scoreId }, function(err) {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.type('application/json');
+    if (err) {
+      res.send(500, { error: err.message || 'Undefined error' });
+    } else {
+      res.send({ deleted: true });
+    }
+  });
+});
 
 app.get('/:gameId', function(req, res) {
   var options = {
