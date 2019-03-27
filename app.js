@@ -92,7 +92,7 @@ function addToList(gameId, attributes, cb) {
 app.get('/:gameId', function(req, res) {
   var options = {
     order: req.query.reverse ? -1 : 1,
-    limit: req.query.limit || 10,
+    limit: parseInt(req.query.limit) || 10,
     scope: req.query.scope || null
   };
   getList(req.params.gameId, options, function(err, items) {
