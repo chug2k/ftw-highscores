@@ -103,6 +103,18 @@ app.delete('/:gameId/:scoreId', function(req, res) {
   });
 });
 
+app.delete('/:loi', function(req, res) {
+  GameEntry.deleteMany({}, function(err) {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.type('application/json');
+    if (err) {
+      res.send(500, { error: err.message || 'Undefined error' });
+    } else {
+      res.send({ deleted: true });
+    }
+  });
+});
+
 app.get('/:gameId', function(req, res) {
   var options = {
     order: req.query.reverse ? -1 : 1,
@@ -131,6 +143,8 @@ app.post('/:gameId', function(req, res) {
     }
   });
 });
+
+app.get('')
 
 app.listen(theport);
 console.log("Started server at 172.0.0.1:8181");
